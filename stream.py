@@ -29,10 +29,16 @@ def ask_mistral(response_input: str = None, auth_token: str=None, api_url: str =
         "inputs": prompt
     }
      
-    # API call to Mistral AI Inference Endpoint API   
-    output = requests.post(api_url, headers=headers, json=payload)
-    
-    return output.json()
+     # API call to Mistral AI Inference Endpoint API   
+    try:
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()  # Will raise an exception for HTTP error responses
+        return response.json()
+    except requests.HTTPError as http_err:
+        # You can add more specific error handlers like checking response.content for specific messages.
+        return f"HTTP error occurred: {http_err}"
+    except Exception as err:
+        return f"An error occurred: {err}"
 
 
 # Set the page title and favicon
@@ -76,14 +82,13 @@ for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
   
+# Where you call ask_mistral in your main code
 if response_input := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": response_input})
     st.chat_message("user").write(response_input)
-    try:
-        msg = ask_mistral(response_input, auth_token, endpoint_api_url)
-    except Exception as e:
-        msg = f"There is an Error Message: {e} -- please check the API URL and Auth Token"    
-    
-    st.session_state.messages.append({"role": "assistant", "content": msg})
-    st.chat_message("assistant").write(msg)
-    
+    msg = ask_mistral(response_input, auth_token, endpoint_api_url)
+    if "error" in msg or "HTTP error occurred" in msg:
+        st.warning("Please check the provided API URL and Auth Token values and try again.")
+    else:
+        st.session_state.messages.append({"role": "assistant", "content": msg})
+        st.chat_message("assistant").write(msg)
